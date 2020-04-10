@@ -9,7 +9,7 @@ This script can be used to mount or unount devices like usb sticks.
 
 # recursive function that checks if a partition of the device is 
 # mounted to "/"
-# input: the output of lsblk --json for a device
+# input: the output of lsblk --json for a device (as a dict or list of dicts)
 def checkChildren(children):
     # check if a partition is mounted to root
     for child in children:
@@ -62,6 +62,8 @@ for blockdevice in bd["blockdevices"]:
 
 # format string for dmenu
 dmenu_string = "\n".join(f"{key} ({partitions[key]})" for key in partitions.keys())
+dmenu_string += "\nmount all"
+dmenu_string += "\nunmount all"
 
 # using dmenu, ask user what partition to use
 echo = Popen(["echo", dmenu_string], stdout = PIPE)
@@ -74,15 +76,32 @@ partition = partition.stdout.decode("UTF-8")
 if partition == "":
     exit(1)
 partition = partition.replace("\n", "").split(" ")[0]
-# if it is mounted, unmount it
-if partitions[partition] != "not mounted":
-    run(["umount", partition])
+
+parts = []
+
+# get what needs to be mounted or unmounted
+if "mount" in partition:
+    for part in partitions.keys():
+        if partition == "mount" and partitions[part] == "not mounted":
+            parts.append(part)
+        elif partition == "unmount" and partitions[part] != "not mounted":
+            parts.append(part)
 else:
-# if a device is already mounted to /mnt/usb, make a new directory to mount the device to
-    dest = "/mnt/usb"
-    i = 2
-    while dest in partitions.values():
-        dest = f"/mnt/usb{i}"    
-        i += 1
-    Path(dest).mkdir(parents=True, exist_ok=True)
-    run(["mount", partition, dest])
+    parts.append(partition)
+
+used = []
+for part in parts:
+    # if it is mounted, unmount it
+    if partitions[part] != "not mounted":
+        run(["umount", part])
+        Path(partitions[part]).rmdir()
+    else:
+    # if a device is already mounted to /mnt/usb, make a new directory to mount the device to
+        dest = "/mnt/usb"
+        i = 2
+        while dest in partitions.values() or dest in used:
+            dest = f"/mnt/usb{i}"    
+            i += 1
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        run(["mount", part, dest])
+        used.append(dest)
