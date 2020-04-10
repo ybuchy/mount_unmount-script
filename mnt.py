@@ -2,6 +2,7 @@
 from os import getuid, path, listdir
 from subprocess import run, PIPE, Popen
 from ast import literal_eval
+from pathlib import Path
 """
 This script can be used to mount or unount devices like usb sticks.
 """
@@ -64,14 +65,24 @@ dmenu_string = "\n".join(f"{key} ({partitions[key]})" for key in partitions.keys
 
 # using dmenu, ask user what partition to use
 echo = Popen(["echo", dmenu_string], stdout = PIPE)
-partition = run(["dmenu", "-p", "Which device to (un)mount?"], capture_output=True, stdin=echo.stdout)
+try:
+    partition = run(["dmenu", "-p", "Which device to (un)mount?"], capture_output=True, stdin=echo.stdout)
+except OSError:
+    print("Please make sure dmenu is installed!")
+    exit(1)
 partition = partition.stdout.decode("UTF-8")
 if partition == "":
     exit(1)
 partition = partition.replace("\n", "").split(" ")[0]
-# if partition is not mounted yet, mount to /mnt/usb
-if partitions[partition] == "not mounted":
-    run(["mount", partition, "/mnt/usb"])
 # if it is mounted, unmount it
-else:
+if partitions[partition] != "not mounted":
     run(["umount", partition])
+else:
+# if a device is already mounted to /mnt/usb, make a new directory to mount the device to
+    dest = "/mnt/usb"
+    i = 2
+    while dest in partitions.values():
+        dest = f"/mnt/usb{i}"    
+        i += 1
+    Path(dest).mkdir(parents=True, exist_ok=True)
+    run(["mount", partition, dest])
