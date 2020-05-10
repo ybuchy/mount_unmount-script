@@ -54,11 +54,12 @@ if bd["blockdevices"] == []:
 # go through partitions and check if and where they are mounted
 partitions = {}
 for blockdevice in bd["blockdevices"]:
-    for child in blockdevice["children"]:
-        if child["mountpoint"] is None:
-            partitions[f"/dev/{child['name']}"] = "not mounted"
-        else:
-            partitions[f"/dev/{child['name']}"] = child["mountpoint"]
+    if "children" in blockdevice:
+        for child in blockdevice["children"]:
+            if child["mountpoint"] is None:
+                partitions[f"/dev/{child['name']}"] = "not mounted"
+            else:
+                partitions[f"/dev/{child['name']}"] = child["mountpoint"]
 
 # format string for dmenu
 dmenu_string = "\n".join(f"{key} ({partitions[key]})" for key in partitions.keys())
